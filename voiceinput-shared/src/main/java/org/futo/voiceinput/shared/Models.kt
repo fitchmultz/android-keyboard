@@ -20,7 +20,18 @@ val PARAKEET_ENGLISH_MODEL: ModelLoader = object : ModelLoader {
     override val engineKind: EngineKind
         get() = EngineKind.Parakeet
 
-    override fun exists(context: Context): Boolean = true
+    /**
+     * Treat Parakeet as a built-in asset model, but only report it as existing
+     * if the asset is actually present in the APK.
+     */
+    override fun exists(context: Context): Boolean {
+        return try {
+            context.assets.openFd("parakeet_en.bin").close()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     override fun getRequiredDownloadList(context: Context): List<String> = emptyList()
 
@@ -32,12 +43,14 @@ val PARAKEET_ENGLISH_MODEL: ModelLoader = object : ModelLoader {
     override fun key(context: Context): Any = "BuiltInParakeetEn"
 }
 
+/**
+ * Order here matters if any code treats the first element as the default.
+ * We keep the existing tiny Whisper model as the first entry to avoid changing
+ * the default behavior, and add Parakeet as an additional option.
+ */
 val ENGLISH_MODELS: List<ModelLoader> = listOf(
-    ModelBuiltInAsset(
-        name = R.string.tiny_en_name,
-        ggmlFile = "tiny_en_acft_q8_0.bin.not.tflite"
-    ),
-
+    BUILTIN_ENGLISH_MODEL,
+    PARAKEET_ENGLISH_MODEL,
     ModelDownloadable(
         name = R.string.base_en_name,
         ggmlFile = "base_en_acft_q8_0.bin",

@@ -32,6 +32,13 @@ jstring nativeInfer(
         return env->NewStringUTF("");
     }
 
+    if (state->cancelled) {
+        // Match the cancellation protocol used by WhisperGGML so Kotlin can
+        // surface InferenceCancelledException.
+        const char* cancelled = "<>CANCELLED<>flag";
+        return env->NewStringUTF(cancelled);
+    }
+
     // TODO: implement real inference
     const char* dummy = "";
     return env->NewStringUTF(dummy);

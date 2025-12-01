@@ -53,7 +53,7 @@ import org.futo.voiceinput.shared.RecordingSettings
 import org.futo.voiceinput.shared.SoundPlayer
 import org.futo.voiceinput.shared.types.Language
 import org.futo.voiceinput.shared.types.ModelLoader
-import org.futo.voiceinput.shared.types.getLanguageFromWhisperString
+import org.futo.voiceinput.shared.types.getLanguageFromEngineString
 import org.futo.voiceinput.shared.ui.MicrophoneDeviceState
 import org.futo.voiceinput.shared.whisper.DecodingConfiguration
 import org.futo.voiceinput.shared.whisper.ModelManager
@@ -130,7 +130,9 @@ private class VoiceInputActionWindow(
 
         val primaryModel = model
         val languageSpecificModels = mutableMapOf<Language, ModelLoader>()
-        val allowedLanguages = locales.mapNotNull { getLanguageFromWhisperString(it.language) }.toSet()
+        val allowedLanguages = locales
+            .mapNotNull { getLanguageFromEngineString(primaryModel.engineKind, it.language) }
+            .toSet()
         val glossary = if(usePersonalDict) {
             state.userDictionaryObserver.getWords(locales).filter { it.shortcut.isNullOrEmpty() }.map { it.word }
         } else {

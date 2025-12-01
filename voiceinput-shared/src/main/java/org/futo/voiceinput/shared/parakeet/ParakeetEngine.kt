@@ -39,6 +39,10 @@ class ParakeetEngine(
         suppressNonSpeechTokens: Boolean,
         partialResultCallback: (String) -> Unit
     ): String = withContext(inferenceContext) {
+        if (handle == 0L) {
+            throw IllegalStateException("ParakeetEngine has already been closed, cannot infer")
+        }
+
         this@ParakeetEngine.partialResultCallback = partialResultCallback
 
         val result = inferNative(
@@ -51,7 +55,22 @@ class ParakeetEngine(
             suppressNonSpeechTokens
         ).trim()
 
-        return@withContext result
+        if (result.contains("<>CANCELLED<>")) {
+            when {
+                result.contains("flag") -> {
+                    throw InferenceCancelledException()
+                }
+                result.contains("lang=") -> {
+                    val language = result.split("lang=")[1]
+                    throw BailLanguageException(language)
+                }
+                else -> {
+                    throw IllegalStateException("Cancelled for unknown reason")
+                }
+            }
+        } else {
+            return@withContext result
+        }
     }
 
     override fun cancel() {
