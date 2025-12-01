@@ -316,3 +316,17 @@ fun getLanguageFromWhisperString(str: String): Language? {
         else -> null
     }
 }
+
+fun Language.toEngineString(engineKind: EngineKind): String {
+    return when (engineKind) {
+        EngineKind.Whisper -> this.toWhisperString()
+        EngineKind.Parakeet -> this.toWhisperString()
+    }
+}
+
+fun getLanguageFromEngineString(engineKind: EngineKind, str: String): Language? {
+    return when (engineKind) {
+        EngineKind.Whisper -> getLanguageFromWhisperString(str)
+        EngineKind.Parakeet -> getLanguageFromWhisperString(str)
+    }
+}

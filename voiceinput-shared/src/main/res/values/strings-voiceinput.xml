@@ -36,6 +36,8 @@
 
     <!-- Model name for the tiny english model -->
     <string name="tiny_en_name">English-39 (default)</string>
+    <!-- Model name for the Parakeet english model -->
+    <string name="parakeet_en_name">Parakeet English</string>
     <!-- Model name for the base english model -->
     <string name="base_en_name">English-74 (slower, more accurate)</string>
     <!-- Model name for the small english model -->

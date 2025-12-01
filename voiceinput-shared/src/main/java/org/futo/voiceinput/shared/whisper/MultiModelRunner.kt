@@ -11,8 +11,8 @@ import org.futo.voiceinput.shared.types.InferenceState
 import org.futo.voiceinput.shared.types.Language
 import org.futo.voiceinput.shared.types.ModelInferenceCallback
 import org.futo.voiceinput.shared.types.ModelLoader
-import org.futo.voiceinput.shared.types.getLanguageFromWhisperString
-import org.futo.voiceinput.shared.types.toWhisperString
+import org.futo.voiceinput.shared.types.getLanguageFromEngineString
+import org.futo.voiceinput.shared.types.toEngineString
 
 
 data class MultiModelRunConfiguration(
@@ -55,10 +55,24 @@ class MultiModelRunner(
         callback: ModelInferenceCallback
     ): String = coroutineScope {
         callback.updateStatus(InferenceState.LoadingModel)
-        val primaryModel = modelManager.obtainModel(runConfiguration.primaryModel)
+        val primaryLoader = runConfiguration.primaryModel
+        val engineKind = primaryLoader.engineKind
 
-        val allowedLanguages = decodingConfiguration.languages.map { it.toWhisperString() }.toTypedArray()
-        val bailLanguages = runConfiguration.languageSpecificModels.filter { it.value != runConfiguration.primaryModel }.keys.map { it.toWhisperString() }.toTypedArray()
+        require(runConfiguration.languageSpecificModels.values.all { it.engineKind == engineKind }) {
+            "MultiModelRunner only supports a single engine kind per runConfiguration"
+        }
+
+        val primaryEngine = modelManager.obtainModel(primaryLoader)
+
+        val allowedLanguages = decodingConfiguration.languages
+            .map { it.toEngineString(engineKind) }
+            .toTypedArray()
+
+        val bailLanguages = runConfiguration.languageSpecificModels
+            .filter { it.value != primaryLoader }
+            .keys
+            .map { it.toEngineString(engineKind) }
+            .toTypedArray()
 
         val glossary = if(decodingConfiguration.glossary.isNotEmpty()) {
             "(Glossary: " + decodingConfiguration.glossary.joinToString(separator = ", ") + ")"
@@ -68,7 +82,7 @@ class MultiModelRunner(
 
         val result = try {
             callback.updateStatus(InferenceState.Encoding)
-            primaryModel.infer(
+            primaryEngine.infer(
                 samples = samples,
                 prompt = glossary,
                 languages = allowedLanguages,
@@ -81,16 +95,16 @@ class MultiModelRunner(
             )
         } catch(e: BailLanguageException) {
             callback.updateStatus(InferenceState.SwitchingModel)
-            val language = getLanguageFromWhisperString(e.language)
+            val language = getLanguageFromEngineString(engineKind, e.language)
 
             val specificModelLoader = runConfiguration.languageSpecificModels[language]!!
-            val specificModel = modelManager.obtainModel(specificModelLoader)
+            val specificEngine = modelManager.obtainModel(specificModelLoader)
 
-            specificModel.infer(
+            specificEngine.infer(
                 samples = samples,
                 prompt = glossary,
                 languages = arrayOf(e.language),
-                bailLanguages = arrayOf(),
+                bailLanguages = emptyArray(),
                 decodingMode = DecodingMode.BeamSearch5,
                 suppressNonSpeechTokens = decodingConfiguration.suppressSymbols,
                 partialResultCallback = {

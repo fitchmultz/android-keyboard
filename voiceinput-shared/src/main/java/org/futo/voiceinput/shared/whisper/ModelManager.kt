@@ -1,34 +1,35 @@
 package org.futo.voiceinput.shared.whisper
 
 import android.content.Context
-import org.futo.voiceinput.shared.ggml.WhisperGGML
+import org.futo.voiceinput.shared.types.ASREngine
 import org.futo.voiceinput.shared.types.ModelLoader
 
 
 class ModelManager(
     val context: Context
 ) {
-    private val loadedModels: HashMap<Any, WhisperGGML> = hashMapOf()
+    private val loadedModels: HashMap<Any, ASREngine> = hashMapOf()
 
-    fun obtainModel(model: ModelLoader): WhisperGGML {
+    fun obtainModel(model: ModelLoader): ASREngine {
         val key = model.key(context)
-        if (!loadedModels.contains(key)) {
-            loadedModels[key] = model.loadGGML(context)
+        val existing = loadedModels[key]
+        if (existing != null) {
+            return existing
         }
 
-        return loadedModels[key]!!
+        val engine = model.loadEngine(context)
+        loadedModels[key] = engine
+        return engine
     }
 
     fun cancelAll() {
-        loadedModels.forEach {
-            it.value.cancel()
-        }
+        loadedModels.values.forEach { it.cancel() }
     }
 
     suspend fun cleanUp() {
-        for (model in loadedModels.entries) {
-            model.value.cancel()
-            model.value.close()
+        for (engine in loadedModels.values) {
+            engine.cancel()
+            engine.close()
         }
 
         loadedModels.clear()

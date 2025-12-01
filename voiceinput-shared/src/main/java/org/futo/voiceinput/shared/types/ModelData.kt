@@ -19,8 +19,14 @@ import java.nio.channels.FileChannel
  * @return the loaded memory mapped file.
  * @throws IOException if an I/O error occurs when loading the file model.
  */
+enum class EngineKind {
+    Whisper,
+    Parakeet,
+    // Future engines can be added here
+}
+
 @Throws(IOException::class)
-private fun loadMappedFile(context: Context, filePath: String): MappedByteBuffer {
+fun loadMappedFile(context: Context, filePath: String): MappedByteBuffer {
     context.assets.openFd(filePath).use { fileDescriptor ->
         FileInputStream(fileDescriptor.fileDescriptor).use { inputStream ->
             val fileChannel = inputStream.channel
@@ -36,11 +42,17 @@ interface ModelLoader {
     @get:StringRes
     val name: Int
 
+    /** Which ASR engine this model uses. Defaults to Whisper for existing models. */
+    val engineKind: EngineKind
+        get() = EngineKind.Whisper
+
     fun exists(context: Context): Boolean
     fun getRequiredDownloadList(context: Context): List<String>
 
-    fun loadGGML(context: Context): WhisperGGML
+    /** Load and construct the engine instance for this model. */
+    fun loadEngine(context: Context): ASREngine
 
+    /** Key used by ModelManager to cache this engine instance. */
     fun key(context: Context): Any
 }
 
@@ -48,6 +60,9 @@ internal class ModelBuiltInAsset(
     override val name: Int,
     val ggmlFile: String
 ) : ModelLoader {
+    override val engineKind: EngineKind
+        get() = EngineKind.Whisper
+
     override fun exists(context: Context): Boolean {
         return true
     }
@@ -56,7 +71,7 @@ internal class ModelBuiltInAsset(
         return listOf()
     }
 
-    override fun loadGGML(context: Context): WhisperGGML {
+    override fun loadEngine(context: Context): ASREngine {
         val file = loadMappedFile(context, ggmlFile)
         return WhisperGGML(file)
     }
@@ -87,6 +102,9 @@ internal class ModelDownloadable(
     val ggmlFile: String,
     val checksum: String
 ) : ModelLoader {
+    override val engineKind: EngineKind
+        get() = EngineKind.Whisper
+
     override fun exists(context: Context): Boolean {
         return getRequiredDownloadList(context).isEmpty()
     }
@@ -97,7 +115,7 @@ internal class ModelDownloadable(
         }
     }
 
-    override fun loadGGML(context: Context): WhisperGGML {
+    override fun loadEngine(context: Context): ASREngine {
         val file = context.tryOpenDownloadedModel(ggmlFile)
         return WhisperGGML(file)
     }
@@ -111,6 +129,9 @@ public class ModelFileFile(
     override val name: Int,
     val file: File,
 ) : ModelLoader {
+    override val engineKind: EngineKind
+        get() = EngineKind.Whisper
+
     override fun exists(context: Context): Boolean {
         return file.exists()
     }
@@ -119,7 +140,7 @@ public class ModelFileFile(
         return listOf()
     }
 
-    override fun loadGGML(context: Context): WhisperGGML {
+    override fun loadEngine(context: Context): ASREngine {
         val file = tryOpenDownloadedModel(file)
         return WhisperGGML(file)
     }

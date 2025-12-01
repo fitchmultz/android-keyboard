@@ -1,13 +1,36 @@
 package org.futo.voiceinput.shared
 
+import android.content.Context
+import org.futo.voiceinput.shared.parakeet.ParakeetEngine
+import org.futo.voiceinput.shared.types.ASREngine
+import org.futo.voiceinput.shared.types.EngineKind
 import org.futo.voiceinput.shared.types.ModelBuiltInAsset
 import org.futo.voiceinput.shared.types.ModelDownloadable
 import org.futo.voiceinput.shared.types.ModelLoader
+import org.futo.voiceinput.shared.types.loadMappedFile
 
 val BUILTIN_ENGLISH_MODEL: ModelLoader = ModelBuiltInAsset(
     name = R.string.tiny_en_name,
     ggmlFile = "tiny_en_acft_q8_0.bin.not.tflite"
 )
+
+val PARAKEET_ENGLISH_MODEL: ModelLoader = object : ModelLoader {
+    override val name: Int = R.string.parakeet_en_name
+
+    override val engineKind: EngineKind
+        get() = EngineKind.Parakeet
+
+    override fun exists(context: Context): Boolean = true
+
+    override fun getRequiredDownloadList(context: Context): List<String> = emptyList()
+
+    override fun loadEngine(context: Context): ASREngine {
+        val buffer = loadMappedFile(context, "parakeet_en.bin")
+        return ParakeetEngine(buffer)
+    }
+
+    override fun key(context: Context): Any = "BuiltInParakeetEn"
+}
 
 val ENGLISH_MODELS: List<ModelLoader> = listOf(
     ModelBuiltInAsset(
