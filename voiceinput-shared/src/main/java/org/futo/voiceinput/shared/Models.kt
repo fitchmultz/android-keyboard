@@ -50,7 +50,6 @@ val PARAKEET_ENGLISH_MODEL: ModelLoader = object : ModelLoader {
  */
 val ENGLISH_MODELS: List<ModelLoader> = listOf(
     BUILTIN_ENGLISH_MODEL,
-    PARAKEET_ENGLISH_MODEL,
     ModelDownloadable(
         name = R.string.base_en_name,
         ggmlFile = "base_en_acft_q8_0.bin",
@@ -61,6 +60,7 @@ val ENGLISH_MODELS: List<ModelLoader> = listOf(
         ggmlFile = "small_en_acft_q8_0.bin",
         checksum = "58fbe949992dafed917590d58bc12ca577b08b9957f0b3e0d7ee71b64bed3aa8"
     ),
+    PARAKEET_ENGLISH_MODEL,
 )
 
 val MULTILINGUAL_MODELS: List<ModelLoader> = listOf(

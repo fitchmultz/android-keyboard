@@ -65,6 +65,7 @@ import org.futo.inputmethod.latin.utils.SubtypeLocaleUtils
 import org.futo.inputmethod.latin.xlm.ModelPaths
 import org.futo.inputmethod.updates.openURI
 import org.futo.voiceinput.shared.BUILTIN_ENGLISH_MODEL
+import org.futo.voiceinput.shared.ENGLISH_MODELS
 import org.futo.voiceinput.shared.types.ModelFileFile
 import org.futo.voiceinput.shared.types.ModelLoader
 import java.io.BufferedReader
@@ -528,6 +529,37 @@ object ResourceHelper {
         "en" to BUILTIN_ENGLISH_MODEL
     )
 
+    private fun voiceInputBuiltInPreferenceKey(locale: Locale): Preferences.Key<String> {
+        val normalized = locale.toString().replace("#", "H")
+        return stringPreferencesKey("voiceinput_builtin_$normalized")
+    }
+
+    fun getBuiltInVoiceInputModelsForLanguage(context: Context, language: String): List<ModelLoader> {
+        return when (language) {
+            "en" -> ENGLISH_MODELS.filter { it.exists(context) }
+            else -> emptyList()
+        }
+    }
+
+    fun getPreferredBuiltInVoiceInputModel(context: Context, locale: Locale): ModelLoader? {
+        val builtIns = getBuiltInVoiceInputModelsForLanguage(context, locale.language)
+        if (builtIns.isEmpty()) {
+            return BuiltInVoiceInputFallbacks[locale.language]
+        }
+
+        val selectedKey = runBlocking { context.getSetting(voiceInputBuiltInPreferenceKey(locale), "") }
+        val selected = builtIns.firstOrNull { it.key(context).toString() == selectedKey }
+        return selected ?: builtIns.first()
+    }
+
+    fun setPreferredBuiltInVoiceInputModel(context: Context, locale: Locale, model: ModelLoader) {
+        runBlocking { context.setSetting(voiceInputBuiltInPreferenceKey(locale), model.key(context).toString()) }
+    }
+
+    fun clearPreferredBuiltInVoiceInputModel(context: Context, locale: Locale) {
+        runBlocking { context.setSetting(voiceInputBuiltInPreferenceKey(locale), "") }
+    }
+
     fun findKeyForLocaleAndKind(context: Context, locale: Locale, kind: FileKind): String? {
         val keysToTry = listOf(
             locale.toString(),
@@ -559,7 +591,10 @@ object ResourceHelper {
 
     fun tryFindingVoiceInputModelForLocale(context: Context, locale: Locale): ModelLoader? {
         val file = runBlocking { findFileForKind(context, locale, FileKind.VoiceInput) }
-            ?: return BuiltInVoiceInputFallbacks[locale.language]
+
+        if (file == null) {
+            return getPreferredBuiltInVoiceInputModel(context, locale)
+        }
 
         return ModelFileFile(R.string.settings_external_model_name, file)
     }
@@ -587,6 +622,9 @@ object ResourceHelper {
 
         runBlocking { context.setSetting(kind.preferenceKeyFor(locale.toString()), "") }
         runBlocking { context.setSetting(kind.namePreferenceKeyFor(locale.toString()), "") }
+        if (kind == FileKind.VoiceInput) {
+            clearPreferredBuiltInVoiceInputModel(context, locale)
+        }
 
         GlobalIMEMessage.tryEmit(IMEMessage.ReloadResources)
     }

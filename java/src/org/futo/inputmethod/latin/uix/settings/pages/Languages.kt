@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.Checkbox
@@ -74,6 +75,7 @@ import org.futo.inputmethod.latin.utils.Dictionaries
 import org.futo.inputmethod.latin.utils.SubtypeLocaleUtils
 import org.futo.inputmethod.latin.xlm.ModelPaths
 import org.futo.inputmethod.updates.openURI
+import org.futo.voiceinput.shared.types.ModelLoader
 import java.util.Locale
 
 private val InputMethodSubtype.layoutSetName
@@ -368,7 +370,10 @@ fun ConfirmResourceActionDialog(
 
     resourceKind: FileKind,
     isCurrentlySet: Boolean,
-    locale: Locale
+    locale: Locale,
+    builtInVoiceInputModels: List<ModelLoader> = emptyList(),
+    selectedBuiltInModel: ModelLoader? = null,
+    onSelectBuiltInModel: ((ModelLoader) -> Unit)? = null
 ) {
     val hasBuiltInFallback = if (resourceKind == FileKind.VoiceInput) {
         ResourceHelper.BuiltInVoiceInputFallbacks[locale.language] != null
@@ -386,34 +391,54 @@ fun ConfirmResourceActionDialog(
             Text(text = "${locale.displayLanguage} - ${resourceKind.kindTitle(LocalContext.current)}")
         },
         text = {
-            if (isCurrentlySet) {
-                Text(
-                    text = when (resourceKind) {
-                        FileKind.VoiceInput -> stringResource(R.string.language_settings_resource_voice_input_selected)
-                        FileKind.Transformer -> stringResource(R.string.language_settings_resource_transformer_selected)
-                        FileKind.Dictionary -> stringResource(R.string.language_settings_resource_dictionary_selected)
-                        FileKind.Invalid -> ""
-                    } + if (!hasBuiltInFallback) {
-                        "\n\n" +
-                                when (resourceKind) {
-                                    FileKind.VoiceInput -> stringResource(R.string.language_settings_resource_voice_input_selected_no_default_warning)
-                                    FileKind.Transformer -> stringResource(R.string.language_settings_resource_transformer_selected_no_default_warning)
-                                    FileKind.Dictionary -> stringResource(R.string.language_settings_resource_dictionary_selected_no_default_warning)
-                                    FileKind.Invalid -> ""
-                                }
-                    } else {
-                        ""
+            val ctx = LocalContext.current
+            Column {
+                if (isCurrentlySet) {
+                    Text(
+                        text = when (resourceKind) {
+                            FileKind.VoiceInput -> stringResource(R.string.language_settings_resource_voice_input_selected)
+                            FileKind.Transformer -> stringResource(R.string.language_settings_resource_transformer_selected)
+                            FileKind.Dictionary -> stringResource(R.string.language_settings_resource_dictionary_selected)
+                            FileKind.Invalid -> ""
+                        } + if (!hasBuiltInFallback) {
+                            "\n\n" +
+                                    when (resourceKind) {
+                                        FileKind.VoiceInput -> stringResource(R.string.language_settings_resource_voice_input_selected_no_default_warning)
+                                        FileKind.Transformer -> stringResource(R.string.language_settings_resource_transformer_selected_no_default_warning)
+                                        FileKind.Dictionary -> stringResource(R.string.language_settings_resource_dictionary_selected_no_default_warning)
+                                        FileKind.Invalid -> ""
+                                    }
+                        } else {
+                            ""
+                        }
+                    )
+                } else {
+                    Text(
+                        text = when (resourceKind) {
+                            FileKind.VoiceInput -> stringResource(R.string.language_settings_resource_voice_input_selected_unset)
+                            FileKind.Transformer -> stringResource(R.string.language_settings_resource_transformer_selected_unset)
+                            FileKind.Dictionary -> stringResource(R.string.language_settings_resource_dictionary_selected_unset)
+                            FileKind.Invalid -> ""
+                        }
+                    )
+                }
+
+                if (resourceKind == FileKind.VoiceInput && builtInVoiceInputModels.isNotEmpty() && onSelectBuiltInModel != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(stringResource(R.string.language_settings_resource_voice_input_builtin_models))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    builtInVoiceInputModels.forEach { model ->
+                        val label = stringResource(model.name)
+                        val isSelected = selectedBuiltInModel?.key(ctx) == model.key(ctx)
+                        TextButton(onClick = { onSelectBuiltInModel(model) }) {
+                            if (isSelected) {
+                                Icon(Icons.Default.Check, contentDescription = null)
+                                Spacer(modifier = Modifier.width(6.dp))
+                            }
+                            Text(label)
+                        }
                     }
-                )
-            } else {
-                Text(
-                    text = when (resourceKind) {
-                        FileKind.VoiceInput -> stringResource(R.string.language_settings_resource_voice_input_selected_unset)
-                        FileKind.Transformer -> stringResource(R.string.language_settings_resource_transformer_selected_unset)
-                        FileKind.Dictionary -> stringResource(R.string.language_settings_resource_dictionary_selected_unset)
-                        FileKind.Invalid -> ""
-                    }
-                )
+                }
             }
         },
         onDismissRequest = {
@@ -578,6 +603,16 @@ fun LanguagesScreen(navController: NavHostController = rememberNavController()) 
 
     if (deleteDialogInfo.value != null) {
         val info = deleteDialogInfo.value!!
+        val builtInVoiceInputModels = if (info.kind == FileKind.VoiceInput) {
+            ResourceHelper.getBuiltInVoiceInputModelsForLanguage(context, info.locale.language)
+        } else {
+            emptyList()
+        }
+        val selectedBuiltInModel = if (info.kind == FileKind.VoiceInput) {
+            ResourceHelper.getPreferredBuiltInVoiceInputModel(context, info.locale)
+        } else {
+            null
+        }
         ConfirmResourceActionDialog(
             onDismissRequest = { deleteDialogInfo.value = null },
             onExplore = {
@@ -601,6 +636,17 @@ fun LanguagesScreen(navController: NavHostController = rememberNavController()) 
                     info.locale,
                     info.kind
                 )?.exists() == true
+            },
+            builtInVoiceInputModels = builtInVoiceInputModels,
+            selectedBuiltInModel = selectedBuiltInModel,
+            onSelectBuiltInModel = if (info.kind == FileKind.VoiceInput && builtInVoiceInputModels.isNotEmpty()) {
+                { model ->
+                    ResourceHelper.deleteResourceForLanguage(context, FileKind.VoiceInput, info.locale)
+                    ResourceHelper.setPreferredBuiltInVoiceInputModel(context, info.locale, model)
+                    deleteDialogInfo.value = null
+                }
+            } else {
+                null
             }
         )
     } else if (languageDeleteInfo.value != null) {

@@ -312,6 +312,7 @@
     <string name="language_settings_resource_voice_input_selected">Would you like to revert the voice input model to default, or replace it with another file?</string>
     <string name="language_settings_resource_voice_input_selected_no_default_warning">No built-in voice input model exists for this language, so if you remove it, voice input will stop working for this language until you import a different model!</string>
     <string name="language_settings_resource_voice_input_selected_unset">You have not configured a custom voice input model for this language. You can explore downloads online, or import one from a file.</string>
+    <string name="language_settings_resource_voice_input_builtin_models">Built-in voice input models</string>
     <string name="language_settings_resource_transformer_selected">Would you like to revert the transformer model to default, or replace it with another file?</string>
     <string name="language_settings_resource_transformer_selected_no_default_warning">No built-in transformer model exists for this language, so if you remove it, transformer-based predictions will stop working for this language until you import a different model!</string>
     <string name="language_settings_resource_transformer_selected_unset">You have not configured a custom transformer model for this language. You can explore downloads online, or import one from a file.</string>
