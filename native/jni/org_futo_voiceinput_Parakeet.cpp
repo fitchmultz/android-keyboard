@@ -1,4 +1,5 @@
 #include <jni.h>
+#include <atomic>
 #include <string>
 #include "jni_common.h"
 #include "org_futo_voiceinput_Parakeet.h"
@@ -6,9 +7,29 @@
 namespace {
 
 struct ParakeetState {
-    // Add fields for Parakeet model context when you implement it
-    bool cancelled = false;
+    // Cancellation flag, may be read from the inference thread and written from a cancel call.
+    std::atomic<bool> cancelled{false};
+
+    // These fields will be used when the real Parakeet backend is wired up and needs to emit partial results.
+    // For now they are set up but not used.
+    JNIEnv* env = nullptr;
+    jobject partial_result_instance = nullptr;
+    jmethodID partial_result_method = nullptr;
+
+    // Future fields: model context pointer, decoding parameters, etc.
+    // For now the stub does not hold a real model.
 };
+
+static void emit_partial_result(ParakeetState* state, const std::string& text) {
+    if (!state || !state->env || !state->partial_result_instance || !state->partial_result_method) {
+        return;
+    }
+
+    JNIEnv* env = state->env;
+    jstring jtext = env->NewStringUTF(text.c_str());
+    env->CallVoidMethod(state->partial_result_instance, state->partial_result_method, jtext);
+    env->DeleteLocalRef(jtext);
+}
 
 jlong nativeOpenFromBuffer(JNIEnv* env, jclass /*clazz*/, jobject /*buffer*/) {
     // TODO: map buffer and construct Parakeet model
@@ -16,6 +37,14 @@ jlong nativeOpenFromBuffer(JNIEnv* env, jclass /*clazz*/, jobject /*buffer*/) {
     return reinterpret_cast<jlong>(state);
 }
 
+// Cancellation protocol expected by Kotlin (mirrors WhisperGGML):
+//
+// - Normal completion: return the final transcript text, with no "<>CANCELLED<>" marker.
+// - Bail on forbidden language: return "<>CANCELLED<> lang=<langId>" and Kotlin will throw BailLanguageException.
+// - User or system cancel: return "<>CANCELLED<> flag" and Kotlin will throw InferenceCancelledException.
+//
+// The exact substrings "<>CANCELLED<> flag" and "<>CANCELLED<> lang=" must be preserved.
+// Parakeet's real backend must follow the same contract when it is implemented.
 jstring nativeInfer(
         JNIEnv* env,
         jobject /*thiz*/,
@@ -32,10 +61,8 @@ jstring nativeInfer(
         return env->NewStringUTF("");
     }
 
-    if (state->cancelled) {
-        // Match the cancellation protocol used by WhisperGGML so Kotlin can
-        // surface InferenceCancelledException.
-        const char* cancelled = "<>CANCELLED<>flag";
+    if (state->cancelled.load(std::memory_order_relaxed)) {
+        const char* cancelled = "<>CANCELLED<> flag";
         return env->NewStringUTF(cancelled);
     }
 
@@ -47,7 +74,7 @@ jstring nativeInfer(
 void nativeCancel(JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
     auto* state = reinterpret_cast<ParakeetState*>(handle);
     if (!state) return;
-    state->cancelled = true;
+    state->cancelled.store(true, std::memory_order_relaxed);
 }
 
 void nativeClose(JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {

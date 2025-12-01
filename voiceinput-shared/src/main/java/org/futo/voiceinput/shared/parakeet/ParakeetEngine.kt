@@ -25,10 +25,18 @@ class ParakeetEngine(
     }
 
     @Keep
+    // Called from native code to deliver partial recognition results.
+    // The current native Parakeet stub never calls this; once the real backend is wired
+    // up, it should invoke this method similarly to how WhisperGGML does.
     private fun invokePartialResult(text: String) {
         partialResultCallback(text.trim())
     }
 
+    // Native may return:
+    //   - plain transcript text
+    //   - "<>CANCELLED<> flag" to signal user cancellation
+    //   - "<>CANCELLED<> lang=<id>" to signal bail on a forbidden language
+    // These markers are translated to InferenceCancelledException and BailLanguageException here.
     @Throws(BailLanguageException::class, InferenceCancelledException::class)
     override suspend fun infer(
         samples: FloatArray,
