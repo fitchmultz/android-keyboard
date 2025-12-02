@@ -6,6 +6,9 @@
 
 namespace {
 
+// Stub implementation to keep the Parakeet JNI wiring and cancellation protocol exercised.
+// Expected behavior and return markers for a real backend are described in
+// docs/parakeet_backend_contract.md.
 struct ParakeetState {
     // Cancellation flag, may be read from the inference thread and written from a cancel call.
     std::atomic<bool> cancelled{false};
@@ -45,6 +48,7 @@ jlong nativeOpenFromBuffer(JNIEnv* env, jclass /*clazz*/, jobject /*buffer*/) {
 //
 // The exact substrings "<>CANCELLED<> flag" and "<>CANCELLED<> lang=" must be preserved.
 // Parakeet's real backend must follow the same contract when it is implemented.
+// See docs/parakeet_backend_contract.md for the full return-value protocol.
 jstring nativeInfer(
         JNIEnv* env,
         jobject /*thiz*/,

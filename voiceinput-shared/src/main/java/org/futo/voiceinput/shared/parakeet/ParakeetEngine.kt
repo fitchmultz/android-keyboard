@@ -9,6 +9,14 @@ import org.futo.voiceinput.shared.ggml.inferenceContext
 import org.futo.voiceinput.shared.types.ASREngine
 import java.nio.Buffer
 
+/**
+ * ASREngine implementation for EngineKind.Parakeet.
+ *
+ * The engine simply forwards audio/configuration to the native bridge defined in
+ * native/jni/org_futo_voiceinput_Parakeet.cpp and decodes the cancellation/bail markers
+ * documented in docs/parakeet_backend_contract.md. For a high-level view of where Parakeet
+ * fits in the voice pipeline, see docs/parakeet_overview.md.
+ */
 @Keep
 class ParakeetEngine(
     modelBuffer: Buffer
@@ -63,6 +71,7 @@ class ParakeetEngine(
             suppressNonSpeechTokens
         ).trim()
 
+        // Cancellation/bail markers are shared with Whisper and documented centrally.
         if (result.contains("<>CANCELLED<>")) {
             when {
                 result.contains("flag") -> {
