@@ -1,5 +1,6 @@
 package org.futo.voiceinput.shared.whisper
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
@@ -29,6 +30,10 @@ data class DecodingConfiguration(
 class MultiModelRunner(
     private val modelManager: ModelManager
 ) {
+    companion object {
+        private const val LOG_TAG = "VoiceInput"
+    }
+
     suspend fun preload(runConfiguration: MultiModelRunConfiguration) = coroutineScope {
         val jobs = mutableListOf<Job>()
 
@@ -63,6 +68,7 @@ class MultiModelRunner(
         }
 
         val primaryEngine = modelManager.obtainModel(primaryLoader)
+        val modelKey = primaryLoader.key(modelManager.context).toString()
 
         val allowedLanguages = decodingConfiguration.languages
             .map { it.toEngineString(engineKind) }
@@ -73,6 +79,10 @@ class MultiModelRunner(
             .keys
             .map { it.toEngineString(engineKind) }
             .toTypedArray()
+        Log.d(
+            LOG_TAG,
+            "ASR start engine=$engineKind modelKey=$modelKey languages=${allowedLanguages.joinToString()} bail=${bailLanguages.joinToString()}"
+        )
 
         val glossary = if(decodingConfiguration.glossary.isNotEmpty()) {
             "(Glossary: " + decodingConfiguration.glossary.joinToString(separator = ", ") + ")"
@@ -99,6 +109,10 @@ class MultiModelRunner(
 
             val specificModelLoader = runConfiguration.languageSpecificModels[language]!!
             val specificEngine = modelManager.obtainModel(specificModelLoader)
+            Log.d(
+                LOG_TAG,
+                "ASR bail engine=$engineKind fromModel=$modelKey toModel=${specificModelLoader.key(modelManager.context)} language=${e.language}"
+            )
 
             specificEngine.infer(
                 samples = samples,
@@ -113,6 +127,7 @@ class MultiModelRunner(
             )
         }
 
+        Log.d(LOG_TAG, "ASR completed engine=$engineKind modelKey=$modelKey status=success")
         return@coroutineScope result
     }
 

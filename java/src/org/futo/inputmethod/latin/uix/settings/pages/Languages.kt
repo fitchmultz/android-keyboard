@@ -613,6 +613,22 @@ fun LanguagesScreen(navController: NavHostController = rememberNavController()) 
         } else {
             null
         }
+        val hasExternalFile = runBlocking {
+            ResourceHelper.findFileForKind(
+                context,
+                info.locale,
+                info.kind
+            )?.exists() == true
+        }
+
+        val isCurrentlySet = when (info.kind) {
+            FileKind.VoiceInput -> {
+                hasExternalFile ||
+                        ResourceHelper.hasNonDefaultBuiltInVoiceModel(context, info.locale)
+            }
+            else -> hasExternalFile
+        }
+
         ConfirmResourceActionDialog(
             onDismissRequest = { deleteDialogInfo.value = null },
             onExplore = {
@@ -627,22 +643,14 @@ fun LanguagesScreen(navController: NavHostController = rememberNavController()) 
                 openModelImporter(context)
                 deleteDialogInfo.value = null
             },
-
             resourceKind = info.kind,
             locale = info.locale,
-            isCurrentlySet = runBlocking {
-                ResourceHelper.findFileForKind(
-                    context,
-                    info.locale,
-                    info.kind
-                )?.exists() == true
-            },
+            isCurrentlySet = isCurrentlySet,
             builtInVoiceInputModels = builtInVoiceInputModels,
             selectedBuiltInModel = selectedBuiltInModel,
             onSelectBuiltInModel = if (info.kind == FileKind.VoiceInput && builtInVoiceInputModels.isNotEmpty()) {
                 { model ->
-                    ResourceHelper.deleteResourceForLanguage(context, FileKind.VoiceInput, info.locale)
-                    ResourceHelper.setPreferredBuiltInVoiceInputModel(context, info.locale, model)
+                    ResourceHelper.selectBuiltInVoiceInputModel(context, info.locale, model)
                     deleteDialogInfo.value = null
                 }
             } else {
@@ -697,10 +705,25 @@ fun LanguagesScreen(navController: NavHostController = rememberNavController()) 
 
             val name = Subtypes.getName(subtypes.first())
 
+            val hasExternalVoiceModel = runBlocking {
+                ResourceHelper.findFileForKind(
+                    context,
+                    locale,
+                    FileKind.VoiceInput
+                )
+            }?.exists() == true
+
             val voiceInputModelName = ResourceHelper.tryFindingVoiceInputModelForLocale(
                 context,
                 locale
-            )?.name?.let { stringResource(it) }
+            )?.let { model ->
+                val baseName = stringResource(model.name)
+                if (hasExternalVoiceModel) {
+                    baseName + " " + context.getString(R.string.language_settings_resource_imported_indicator)
+                } else {
+                    baseName
+                }
+            }
             val dictionaryName = runBlocking {
                 ResourceHelper.findKeyForLocaleAndKind(
                     context,

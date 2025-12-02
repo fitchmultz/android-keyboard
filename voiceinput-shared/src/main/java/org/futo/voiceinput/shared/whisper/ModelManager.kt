@@ -10,6 +10,11 @@ class ModelManager(
 ) {
     private val loadedModels: HashMap<Any, ASREngine> = hashMapOf()
 
+    private fun createEngineForModel(loader: ModelLoader): ASREngine {
+        // ModelLoader knows how to build the concrete engine (Whisper, Parakeet, etc.).
+        return loader.loadEngine(context)
+    }
+
     fun obtainModel(model: ModelLoader): ASREngine {
         val key = model.key(context)
         val existing = loadedModels[key]
@@ -17,7 +22,7 @@ class ModelManager(
             return existing
         }
 
-        val engine = model.loadEngine(context)
+        val engine = createEngineForModel(model)
         loadedModels[key] = engine
         return engine
     }

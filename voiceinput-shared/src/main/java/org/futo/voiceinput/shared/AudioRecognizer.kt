@@ -37,6 +37,7 @@ import org.futo.voiceinput.shared.types.Language
 import org.futo.voiceinput.shared.types.MagnitudeState
 import org.futo.voiceinput.shared.types.ModelInferenceCallback
 import org.futo.voiceinput.shared.types.ModelLoader
+import org.futo.voiceinput.shared.types.toEngineString
 import org.futo.voiceinput.shared.ui.MicrophoneDeviceState
 import org.futo.voiceinput.shared.whisper.DecodingConfiguration
 import org.futo.voiceinput.shared.whisper.ModelManager
@@ -48,6 +49,8 @@ import java.nio.ShortBuffer
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
+
+private const val LOG_TAG = "VoiceInput"
 
 private fun getRecordingDeviceKind(type: Int): String {
     return when (type) {
@@ -551,6 +554,22 @@ class AudioRecognizer(
         val floatArray = floatSamples.array().sliceArray(0 until floatSamples.position())
 
         yield()
+        val primaryModel = settings.modelRunConfiguration.primaryModel
+        val engineKind = primaryModel.engineKind
+        val allowedLanguagesLog = settings.decodingConfiguration.languages
+            .map { it.toEngineString(engineKind) }
+            .joinToString()
+        val bailLanguagesLog = settings.modelRunConfiguration.languageSpecificModels
+            .filter { it.value != primaryModel }
+            .keys
+            .map { it.toEngineString(engineKind) }
+            .joinToString()
+        val modelKeyLog = primaryModel.key(context).toString()
+
+        Log.d(
+            LOG_TAG,
+            "ASR run start engine=$engineKind modelKey=$modelKeyLog languages=$allowedLanguagesLog bail=$bailLanguagesLog"
+        )
         val outputText = try {
              modelRunner.run(
                 floatArray,
@@ -559,10 +578,12 @@ class AudioRecognizer(
                 runnerCallback
             ).trim()
         }catch(e: InferenceCancelledException) {
+            Log.d(LOG_TAG, "ASR run cancelled engine=$engineKind modelKey=$modelKeyLog")
             yield()
             return
         }
 
+        Log.d(LOG_TAG, "ASR run completed engine=$engineKind modelKey=$modelKeyLog")
         val text = when {
             isBlankResult(outputText) -> ""
             else -> outputText

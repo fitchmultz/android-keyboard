@@ -560,6 +560,38 @@ object ResourceHelper {
         runBlocking { context.setSetting(voiceInputBuiltInPreferenceKey(locale), "") }
     }
 
+    fun hasNonDefaultBuiltInVoiceModel(context: Context, locale: Locale): Boolean {
+        val builtIns = getBuiltInVoiceInputModelsForLanguage(context, locale.language)
+        if (builtIns.isEmpty()) {
+            return false
+        }
+
+        val defaultModel = builtIns.first()
+        val preferredModel = getPreferredBuiltInVoiceInputModel(context, locale) ?: defaultModel
+
+        return preferredModel.key(context) != defaultModel.key(context)
+    }
+
+    private fun deleteExternalVoiceInputFileForLocale(context: Context, locale: Locale) {
+        val setting = FileKind.VoiceInput.preferenceKeyFor(locale.toString())
+        val value = runBlocking { context.getSetting(setting, "") }
+        if (value.isNotBlank()) {
+            val file = File(context.getExternalFilesDir(null), value)
+            file.delete()
+        }
+
+        runBlocking {
+            context.setSetting(FileKind.VoiceInput.preferenceKeyFor(locale.toString()), "")
+            context.setSetting(FileKind.VoiceInput.namePreferenceKeyFor(locale.toString()), "")
+        }
+    }
+
+    fun selectBuiltInVoiceInputModel(context: Context, locale: Locale, model: ModelLoader) {
+        deleteExternalVoiceInputFileForLocale(context, locale)
+        setPreferredBuiltInVoiceInputModel(context, locale, model)
+        GlobalIMEMessage.tryEmit(IMEMessage.ReloadResources)
+    }
+
     fun findKeyForLocaleAndKind(context: Context, locale: Locale, kind: FileKind): String? {
         val keysToTry = listOf(
             locale.toString(),
@@ -613,17 +645,19 @@ object ResourceHelper {
     }
 
     fun deleteResourceForLanguage(context: Context, kind: FileKind, locale: Locale) {
-        val setting = kind.preferenceKeyFor(locale.toString())
-        val value = runBlocking { context.getSetting(setting, "") }
-        if(value.isNotBlank()) {
-            val file = File(context.getExternalFilesDir(null), value)
-            file.delete()
-        }
-
-        runBlocking { context.setSetting(kind.preferenceKeyFor(locale.toString()), "") }
-        runBlocking { context.setSetting(kind.namePreferenceKeyFor(locale.toString()), "") }
         if (kind == FileKind.VoiceInput) {
+            deleteExternalVoiceInputFileForLocale(context, locale)
             clearPreferredBuiltInVoiceInputModel(context, locale)
+        } else {
+            val setting = kind.preferenceKeyFor(locale.toString())
+            val value = runBlocking { context.getSetting(setting, "") }
+            if(value.isNotBlank()) {
+                val file = File(context.getExternalFilesDir(null), value)
+                file.delete()
+            }
+
+            runBlocking { context.setSetting(kind.preferenceKeyFor(locale.toString()), "") }
+            runBlocking { context.setSetting(kind.namePreferenceKeyFor(locale.toString()), "") }
         }
 
         GlobalIMEMessage.tryEmit(IMEMessage.ReloadResources)

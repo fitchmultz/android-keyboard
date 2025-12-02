@@ -19,6 +19,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
@@ -116,6 +117,22 @@ private class VoiceInputActionWindow(
     val model: ModelLoader, val locales: List<Locale>
 ) : ActionWindow(), RecognizerViewListener {
     val context = manager.getContext()
+
+    init {
+        // Debug: see which engine/model/locales are used per voice input session.
+        // This fires once per session and does not log any user text or audio.
+        val modelName = try {
+            context.getString(model.name)
+        } catch (e: Exception) {
+            model.name.toString()
+        }
+        val localesString = locales.joinToString { it.toLanguageTag() }
+
+        Log.i(
+            "VoiceInputAction",
+            "Voice input session starting: engine=${model.engineKind} model=$modelName locales=$localesString"
+        )
+    }
 
     private var shouldPlaySounds: Boolean = false
     private fun loadSettings(): RecognizerViewSettings {
