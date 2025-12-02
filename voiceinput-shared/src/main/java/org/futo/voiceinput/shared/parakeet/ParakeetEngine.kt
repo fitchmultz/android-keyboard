@@ -3,9 +3,11 @@ package org.futo.voiceinput.shared.parakeet
 import androidx.annotation.Keep
 import kotlinx.coroutines.withContext
 import org.futo.voiceinput.shared.ggml.BailLanguageException
+import org.futo.voiceinput.shared.ggml.CancelMarkerResult
 import org.futo.voiceinput.shared.ggml.DecodingMode
 import org.futo.voiceinput.shared.ggml.InferenceCancelledException
 import org.futo.voiceinput.shared.ggml.inferenceContext
+import org.futo.voiceinput.shared.ggml.parseCancelMarker
 import org.futo.voiceinput.shared.types.ASREngine
 import java.nio.Buffer
 
@@ -72,21 +74,19 @@ class ParakeetEngine(
         ).trim()
 
         // Cancellation/bail markers are shared with Whisper and documented centrally.
-        if (result.contains("<>CANCELLED<>")) {
-            when {
-                result.contains("flag") -> {
-                    throw InferenceCancelledException()
-                }
-                result.contains("lang=") -> {
-                    val language = result.split("lang=")[1]
-                    throw BailLanguageException(language)
-                }
-                else -> {
-                    throw IllegalStateException("Cancelled for unknown reason")
-                }
+        when (val marker = parseCancelMarker(result)) {
+            CancelMarkerResult.NotCancelled -> {
+                return@withContext result
             }
-        } else {
-            return@withContext result
+            CancelMarkerResult.CancelledByFlag -> {
+                throw InferenceCancelledException()
+            }
+            is CancelMarkerResult.BailedLanguage -> {
+                throw BailLanguageException(marker.language)
+            }
+            is CancelMarkerResult.UnknownFormat -> {
+                throw IllegalStateException("Cancelled for unknown reason: ${marker.raw}")
+            }
         }
     }
 
